@@ -1,0 +1,18 @@
+---
+name: affince-copilot-fix
+services:
+  affine-copilot-fix:
+    container_name: affine-copilot-fix
+    user: "1000:1000"
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./logs:/app/src/logs
+    environment:
+      - CREATE_LOG=True
+      - API_KEY=mysecretkey
+      - AI_GEMINI_MODEL=gemini-2.0-flash
+    ports:
+      - 5000:5000
+    image: affine-copilot-fix:latest

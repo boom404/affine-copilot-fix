@@ -1,0 +1,14 @@
+# my log files
+*.log
+
+# my .env file
+.env*
+
+# except the env example
+!.env.example
+
+# my local venv files
+post_debugger_env
+
+# log folder from docker-compose
+logs/*
