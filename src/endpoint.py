@@ -32,9 +32,19 @@ if not AI_GEMINI_MODEL:
 def handle_chat_request(messages, system_instruction):
     print("start handle_chat_request call")
     user_messages = [msg['content'] for msg in messages if msg['role'] == 'user' and msg['content']]
-    last_user_message = user_messages[-1] if user_messages else ""
-    
-    text_response = do_api_call(last_user_message, system_instruction)
+
+    history = []
+
+    for msg in messages:
+        text_history = msg['content']
+        user_history = "user"
+        
+        if(msg['role'] == 'assistant'):
+            user_history = "model"
+
+        history.append({'role': f'{user_history}', 'parts': [{"text": f'{text_history}'}]})
+
+    text_response = do_api_call(history, system_instruction)
 
     return text_response
 
@@ -60,19 +70,26 @@ def do_api_call(text, system_instruction):
     url = f'https://generativelanguage.googleapis.com/v1beta/models/{AI_GEMINI_MODEL}:generateContent?key={API_KEY}'
     headers = {"Content-Type": "application/json"}
 
-    # The payload (data) to be sent in the request
     payload = {
-        "contents": [{
-            "parts": [{
-                "text": text
-            }]
-        }],
         "system_instruction": {
             "parts": [{
                 "text": system_instruction
             }]
         }
     }
+
+    # Check if the text is a list (for chat history)
+    # If it is a list, we need to format it correctly
+    # If it is a single string, we can just use it directly
+    if(isinstance(text, list)):     
+        payload["contents"] = [text],
+    else:
+        payload["contents"] = {
+            "parts": [{
+                "text": text
+            }]
+        }
+
 
     response = requests.post(url, headers=headers, data=json.dumps(payload))
     response_data = response.json()
