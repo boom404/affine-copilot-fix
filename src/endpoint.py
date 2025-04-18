@@ -1,26 +1,26 @@
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, stream_with_context
 import json
 import requests
 from datetime import datetime
 from dotenv import load_dotenv
 import os
+import time
 
 # Load the .env file
 load_dotenv()
 
 app = Flask(__name__)
 
-#Settings
-CREATE_LOG=bool(os.getenv('CREATE_LOG'))
+# Settings
+CREATE_LOG = bool(os.getenv('CREATE_LOG'))
 API_KEY = os.getenv('API_KEY')
 AI_GEMINI_MODEL = os.getenv('AI_GEMINI_MODEL')
 LOG_PATH = "logs"
 
 # Create the logs directory if it doesn't exist
-home_directory = os.path.dirname(__file__) # directory of script
+home_directory = os.path.dirname(__file__)
 log_directory = os.path.join(home_directory, LOG_PATH)
-#if not os.path.exists(log_directory):
-#    os.makedirs(log_directory)
+#os.makedirs(log_directory, exist_ok=True)
 
 # Check if the environment variables are set
 if not API_KEY:
@@ -30,143 +30,107 @@ if not AI_GEMINI_MODEL:
     raise ValueError("AI_GEMINI_MODEL must be set in the environment variables.")
 
 def handle_chat_request(messages, system_instruction):
-    print("start handle_chat_request call")
-    user_messages = [msg['content'] for msg in messages if msg['role'] == 'user' and msg['content']]
-
     history = []
-
     for msg in messages:
-        text_history = msg['content']
-        user_history = "user"
-        
-        if(msg['role'] == 'assistant'):
-            user_history = "model"
+        role = "user" if msg["role"] == "user" else "model"
+        history.append({"role": role, "parts": [{"text": msg["content"]}]})
+    return do_api_call(history, system_instruction)
 
-        history.append({'role': f'{user_history}', 'parts': [{"text": f'{text_history}'}]})
+def single_response(text, system_instruction):
+    return do_api_call([{"role": "user", "parts": [{"text": text}]}], system_instruction)
 
-    text_response = do_api_call(history, system_instruction)
-
-    return text_response
-
-def format_response(content, stream=False):
-    print("start format_response call")
-    if stream:
-        def generate():
-            yield f"data: {json.dumps({'choices': [{'delta': {'content': content}}]})}\n\n"
-            yield "data: [DONE]\n\n"
-        return Response(generate(), mimetype='text/event-stream')
-    else:
-        return jsonify({
-            "choices": [{
-                "message": {
-                    "role": "assistant",
-                    "content": content
-                }
-            }]
-        })
-    
-def do_api_call(text, system_instruction):
-    print("start do_api_call call")
+def do_api_call(contents, system_instruction):
     url = f'https://generativelanguage.googleapis.com/v1beta/models/{AI_GEMINI_MODEL}:generateContent?key={API_KEY}'
     headers = {"Content-Type": "application/json"}
 
     payload = {
-        "system_instruction": {
-            "parts": [{
-                "text": system_instruction
-            }]
-        }
+        "system_instruction": {"parts": [{"text": system_instruction}]},
+        "contents": contents
     }
 
-    # Check if the text is a list (for chat history)
-    # If it is a list, we need to format it correctly
-    # If it is a single string, we can just use it directly
-    if(isinstance(text, list)):     
-        payload["contents"] = [text],
-    else:
-        payload["contents"] = {
-            "parts": [{
-                "text": text
-            }]
-        }
-
-
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    response = requests.post(url, headers=headers, json=payload)
     response_data = response.json()
+
+    if "candidates" not in response_data:
+        raise Exception(f"Invalid Gemini response: {response_data}")
+
     text_response = response_data["candidates"][0]["content"]["parts"][0]["text"]
 
-    if(CREATE_LOG):
+    if CREATE_LOG:
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            # Save to file for later inspection
-            print(f"{log_directory}/ai_response.log")
-            with open(f"{log_directory}/ai_response.log", "a") as log_file:
+            with open(os.path.join(log_directory, "ai_response.log"), "a") as log_file:
                 log_file.write(f"\n=== {timestamp} ===\n")
                 log_file.write(f"Instruction: {system_instruction}\n")
                 log_file.write(f"Response: {text_response}\n")
                 log_file.write(json.dumps(response_data, indent=2) + "\n")
-
         except Exception as e:
-            print(e)
-            # for any exception to be catched
-            print(type(e))
-            # to know the type of exception.
-
-    return text_response    
-
-def single_response(text, system_instruction):
-    print("start single_response call")
-    text_response = do_api_call(text, system_instruction)
+            print(f"Logging failed: {e}")
 
     return text_response
+
+def stream_openai_format(gemini_text, model="gpt-4"):
+    response_id = "chatcmpl-mocked"
+    timestamp = int(time.time())
+    for chunk in gemini_text.split():
+        data = {
+            "id": response_id,
+            "object": "chat.completion.chunk",
+            "created": timestamp,
+            "model": model,
+            "choices": [{
+                "delta": {"content": chunk + " "},
+                "index": 0,
+                "finish_reason": None
+            }]
+        }
+        yield f"data: {json.dumps(data)}\n\n"
+        #time.sleep(0.03)
+    yield "data: [DONE]\n\n"
 
 @app.route('/chat/completions', methods=['POST'])
 def chat_completions():
     try:
         data = request.json
-        text_response = ""
-        system_instruction = data['messages'][0]['content']
-        user_content = data['messages'][1]['content']
-        stream = data.get('stream', False)
+        stream = data.get("stream", False)
+        messages = data.get("messages", [])
+        if not messages or len(messages) < 2:
+            return jsonify({"error": "Insufficient messages"}), 400
 
-
-        if(CREATE_LOG):
+        system_instruction = messages[0]["content"]
+        if CREATE_LOG:
             try:
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                # Save to file for later inspection
-                print(f"{log_directory}/post_requests.log")
-                with open(f"{log_directory}/post_requests.log", "a") as log_file:
-                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    client_ip = request.remote_addr
+                with open(os.path.join(log_directory, "post_requests.log"), "a") as log_file:
                     log_file.write(f"\n=== {timestamp} ===\n")
-                    log_file.write(f"IP: {client_ip}\n")
+                    log_file.write(f"IP: {request.remote_addr}\n")
                     log_file.write(json.dumps(data, indent=2) + "\n")
-
             except Exception as e:
-                print(e)
-                # for any exception to be catched
-                print(type(e))
-                # to know the type of exception.
+                print(f"Logging failed: {e}")
 
-        # Check if the messages is more than 2 (then it is a chat)
-        if(len(data['messages']) > 2):
-            text_response = handle_chat_request(data['messages'], system_instruction)        
-        elif isinstance(user_content, list):
-            text = user_content[0]["text"]
-            text_response = single_response(text.strip(), system_instruction)
+        if len(messages) > 2:
+            response_text = handle_chat_request(messages, system_instruction)
+        else:
+            user_content = messages[1]["content"]
+            response_text = single_response(user_content.strip(), system_instruction)
 
-        # Check if text_response is not empty
-        if(text_response):
-            return format_response(text_response, stream)
+        if stream:
+            return Response(
+                stream_with_context(stream_openai_format(response_text)),
+                mimetype="text/event-stream"
+            )
+        else:
+            return jsonify({
+                "choices": [{
+                    "message": {
+                        "role": "assistant",
+                        "content": response_text
+                    }
+                }]
+            })
 
-        # Fallback
-        return jsonify({"error": "Unsupported request"}), 400
-          
     except Exception as e:
-        print(e)
-        # for any exception to be catched
-        print(type(e))
-        # to know the type of exception.        
+        print(f"Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
