@@ -162,10 +162,12 @@ def chat_completions():
         if CREATE_LOG:
             try:
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                with open(os.path.join(log_directory, "chat.log"), "a") as f:
+                with open(os.path.join(log_directory, "chat_completions.log"), "a") as f:
                     f.write(f"\n=== {timestamp} ===\n")
                     f.write(f"\nModel: {model} \n")
                     f.write(f"\nProvider: {AI_PROVIDER}\n")
+                    f.write(f"IP: {request.remote_addr}\n")
+                    f.write(f"Chat mode: {is_chat}\n")
                     f.write(json.dumps(data, indent=2) + "\n")
             except Exception as e:
                 print(f"Logging failed: {e}")
