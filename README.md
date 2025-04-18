@@ -2,49 +2,109 @@
 
 This python script creates a small http server, to handle the Affine Copilot feature with Gemini from Google. Gemini has a free-tier AI API feature.
 
-## Enable Copilot in Affince
+## Create API Key
 
-I'm using Affine in a docker container. You need to find "affine.js" in your volumes and enable the copilot feature. Please remove the comments to enable and add "baseURL". The baseURL must be link to your script. "apiKey, can as it is. It has no effect.
+Get a free Gemini API Key https://aistudio.google.com/apikey
 
-    sudo nano affine.js 
-    ...
-    // /* Copilot Plugin */
-        AFFiNE.use('copilot', {
-        openai: {
-            baseURL: 'http://192.168.7.94:5000',
-            apiKey: 'your-key',
+## Docker Installation
+
+I'm using Affine in a docker container. You need to create `config.json` in your volumes and enable the copilot feature.  The baseUrl must be link to your script. "apiKey, can as it is. It has no effect.
+
+```bash
+nano ./volumes/affine/self-host/config/config.json 
+```
+
+Content on my config.json
+
+```json
+{
+    "$schema": "https://github.com/toeverything/affine/releases/latest/download/config.schema.json",
+    "server": {
+        "name": "My AFFiNE server"
+    },
+    "copilot": {
+        "enabled": true,
+        "providers.openai": {
+            "apiKey": "my-not-exist-api-key",
+            "baseUrl": "http://affine-copilot-fix:5000"
+        },
+        "providers.gemini": {
+            "apiKey": ""
         }
-    //   fal: {
-    //     apiKey: 'your-key',
-    //   },
-    //   unsplashKey: 'your-key',
-    //   storage: {
-    //     provider: 'cloudflare-r2',
-    //     bucket: 'copilot',
-    //   }
-        })
-    ...
+    }
+}
+```
+
+
+Content of my docker-compose.yml
+
+I'musing two seperate networks. One between the containers `affine-net` and `treaefik-net` for the reverse proxy  
+
+```yml
+
+affine-copilot-fix:
+    container_name: affine-copilot-fix
+    user: "1000:1000"
+    build:
+        context: ./affine-copilot-fix
+        dockerfile: Dockerfile
+    volumes:
+        - ./logs:/app/src/logs
+    environment:
+        - CREATE_LOG=True
+        - API_KEY=<ENTER YOUR FREE GEMINI API KEY>
+        - AI_GEMINI_MODEL=gemini-2.0-flash
+    ports:
+        - 5000:5000
+    image: affine-copilot-fix:latest
+    networks:
+        - traefik-net
+        - affine-net
+```
 
 ## Switch to source dir
     cd ./src
 
-## Create API Key
-    cp .env.example .env
 
-Get a free Gemini API Key https://aistudio.google.com/apikey
+## Installation without Docker
+
+Create .env file and change your settings
+
+```
+cp .env.example .env
+```
+
+
 
 ## Create virtual environment
-    python -m venv myenv
 
-## Activate it
-### On Windows:
-    myenv\Scripts\activate
-### On Mac/Linux:
-    source myenv/bin/activate
+```bash
+python -m venv myenv
+```
+    
+
+### Activate virtual env
+
+#### On Windows:
+
+```bash
+myenv\Scripts\activate
+```
+
+#### On Mac/Linux:
+
+```bash
+source myenv/bin/activate
+```
 
 ## Install requirements
-    pip install -r requirements.txt
+
+```
+pip install -r requirements.txt
+```
+
 
 ## Run your server
-    python endpoint.py
-
+```bash
+python endpoint.py
+```
