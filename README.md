@@ -4,7 +4,11 @@ This python script creates a small http server, to handle the Affine Copilot fea
 
 ## Create API Key
 
-To use the Gemini API, you need to obtain an API Key. Visit the following link to create your free Gemini API Key: [Get a free Gemini API Key](https://aistudio.google.com/apikey). Once you have the key, you can use it to configure the application as described below.
+To use the Gemini API, you need to obtain an API Key. Visit the following link to create your free Gemini API Key: [Get a free Gemini API Key](https://aistudio.google.com/apikey). 
+
+To use the OpenRouter API, you need to obtain an API Key. Visit the following link to create your free OpenRouter API Key: [Get a free OpenRouter API Key](https://openrouter.ai/settings/keys). 
+
+Once you have the key(s), you can use it to configure the application as described below.
 
 ## Docker Installation
 
@@ -52,8 +56,11 @@ services:
             - ./logs:/app/src/logs
         environment:
             - CREATE_LOG=True
-            - API_KEY=<ENTER YOUR FREE GEMINI API KEY>
-            - AI_GEMINI_MODEL=gemini-2.0-flash
+            - GEMINI_API_KEY=<ENTER YOUR FREE GEMINI API KEY>
+            - GEMINI_MODEL=gemini-2.5-flash-preview-04-17 # Options: gemini-2.0-flash, gemini-2.5-flash-preview-04-17
+            - OPENROUTER_API_KEY=<ENTER YOUR FREE OPENROUTER API KEY>
+            - OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324:free
+            - AI_PROVIDER=openrouter # Options: openrouter, gemini
         ports:
             - 5000:5000
         image: affine-copilot-fix:latest
