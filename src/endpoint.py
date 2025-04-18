@@ -6,78 +6,108 @@ from dotenv import load_dotenv
 import os
 import time
 
-# Load the .env file
+# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
 
 # Settings
-CREATE_LOG = bool(os.getenv('CREATE_LOG'))
-API_KEY = os.getenv('API_KEY')
-AI_GEMINI_MODEL = os.getenv('AI_GEMINI_MODEL')
-LOG_PATH = "logs"
+CREATE_LOG = bool(os.getenv('CREATE_LOG', False))
+AI_PROVIDER = os.getenv('AI_PROVIDER', 'gemini')
 
-# Create the logs directory if it doesn't exist
+# Gemini
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', '')
+
+# OpenRouter
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+OPENROUTER_MODEL = os.getenv('OPENROUTER_MODEL', '')
+
+# Log setup
+LOG_PATH = "logs"
 home_directory = os.path.dirname(__file__)
 log_directory = os.path.join(home_directory, LOG_PATH)
-#os.makedirs(log_directory, exist_ok=True)
+os.makedirs(log_directory, exist_ok=True)
 
-# Check if the environment variables are set
-if not API_KEY:
-    raise ValueError("API_KEY must be set in the environment variables.")
+def is_chat_conversation(messages):
+    user_messages = [m for m in messages if m['role'] == 'user']
+    assistant_messages = [m for m in messages if m['role'] == 'assistant']
+    return len(user_messages) > 1 or len(assistant_messages) > 0
 
-if not AI_GEMINI_MODEL:
-    raise ValueError("AI_GEMINI_MODEL must be set in the environment variables.")
 
-def handle_chat_request(messages, system_instruction):
+def call_gemini(messages, model, system_instruction):
+    url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}'
+    headers = {"Content-Type": "application/json"}
+
     history = []
     for msg in messages:
-        role = "user" if msg["role"] == "user" else "model"
-        history.append({"role": role, "parts": [{"text": msg["content"]}]})
-    return do_api_call(history, system_instruction)
-
-def single_response(text, system_instruction):
-    return do_api_call([{"role": "user", "parts": [{"text": text}]}], system_instruction)
-
-def do_api_call(contents, system_instruction):
-    url = f'https://generativelanguage.googleapis.com/v1beta/models/{AI_GEMINI_MODEL}:generateContent?key={API_KEY}'
-    headers = {"Content-Type": "application/json"}
+        role = "user" if msg['role'] == 'user' else "model"
+        history.append({"role": role, "parts": [{"text": msg['content']}]})
 
     payload = {
         "system_instruction": {"parts": [{"text": system_instruction}]},
-        "contents": contents
+        "contents": [history]
     }
 
-    response = requests.post(url, headers=headers, json=payload)
-    response_data = response.json()
+    resp = requests.post(url, headers=headers, json=payload)
+    data = resp.json()
+    return data["candidates"][0]["content"]["parts"][0]["text"]
 
-    if "candidates" not in response_data:
-        raise Exception(f"Invalid Gemini response: {response_data}")
 
-    text_response = response_data["candidates"][0]["content"]["parts"][0]["text"]
+def call_openrouter(messages, model, system_instruction=None):
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json"
+    }
 
-    if CREATE_LOG:
-        try:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            with open(os.path.join(log_directory, "ai_response.log"), "a") as log_file:
-                log_file.write(f"\n=== {timestamp} ===\n")
-                log_file.write(f"Instruction: {system_instruction}\n")
-                log_file.write(f"Response: {text_response}\n")
-                log_file.write(json.dumps(response_data, indent=2) + "\n")
-        except Exception as e:
-            print(f"Logging failed: {e}")
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": False
+    }
 
-    return text_response
+    resp = requests.post(url, headers=headers, json=payload)
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"]
 
-def stream_openai_format(gemini_text, model="gpt-4"):
+
+def stream_openrouter(messages, model):
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": True
+    }
+
+    with requests.post(url, headers=headers, json=payload, stream=True) as resp:
+        for line in resp.iter_lines(decode_unicode=True):
+            if line and line.startswith("data: "):
+                chunk = line.removeprefix("data: ").strip()
+                if chunk == "[DONE]":
+                    yield "data: [DONE]\n\n"
+                    break
+                try:
+                    parsed = json.loads(chunk)
+                    yield f"data: {json.dumps(parsed)}\n\n"
+                except Exception as e:
+                    print(f"Parse error: {e}")
+
+
+def stream_openai_format(content):
     response_id = "chatcmpl-mocked"
     timestamp = int(time.time())
-    for chunk in gemini_text.split():
+    for chunk in content.split():
         data = {
             "id": response_id,
             "object": "chat.completion.chunk",
             "created": timestamp,
-            "model": model,
+            "model": "gpt-4",
             "choices": [{
                 "delta": {"content": chunk + " "},
                 "index": 0,
@@ -85,53 +115,78 @@ def stream_openai_format(gemini_text, model="gpt-4"):
             }]
         }
         yield f"data: {json.dumps(data)}\n\n"
-        #time.sleep(0.03)
     yield "data: [DONE]\n\n"
+
+
+def call_ai(messages, model, system_instruction=None):
+    if AI_PROVIDER == 'gemini':
+        return call_gemini(messages, model, system_instruction)
+    elif AI_PROVIDER == 'openrouter':
+        return call_openrouter(messages, model, system_instruction)
+    else:
+        raise ValueError(f"Unsupported AI_PROVIDER: {AI_PROVIDER}")
+
+
+def stream_ai(messages, model, system_instruction=None):
+    if AI_PROVIDER == 'gemini':
+        content = call_gemini(messages, model, system_instruction)
+        return stream_openai_format(content)
+    elif AI_PROVIDER == 'openrouter':
+        return stream_openrouter(messages, model)
+    else:
+        raise ValueError(f"Unsupported AI_PROVIDER: {AI_PROVIDER}")
+
 
 @app.route('/chat/completions', methods=['POST'])
 def chat_completions():
     try:
         data = request.json
-        stream = data.get("stream", False)
         messages = data.get("messages", [])
-        if not messages or len(messages) < 2:
-            return jsonify({"error": "Insufficient messages"}), 400
+        stream = data.get("stream", False)
 
-        system_instruction = messages[0]["content"]
+        model = GEMINI_MODEL if AI_PROVIDER == 'gemini' else OPENROUTER_MODEL
+
+        print(f"Model: {model}")
+        print(f"AI_PROVIDER: {AI_PROVIDER}")
+
+        if not messages:
+            return jsonify({"error": "No messages provided"}), 400
+
+        system_instruction = None
+        if AI_PROVIDER == "gemini" and len(messages) >= 2:
+            system_instruction = messages[0]['content']
+
+        is_chat = is_chat_conversation(messages)
+        print(f"Chat mode: {is_chat}")
+
         if CREATE_LOG:
             try:
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                with open(os.path.join(log_directory, "post_requests.log"), "a") as log_file:
-                    log_file.write(f"\n=== {timestamp} ===\n")
-                    log_file.write(f"IP: {request.remote_addr}\n")
-                    log_file.write(json.dumps(data, indent=2) + "\n")
+                with open(os.path.join(log_directory, "chat_completions.log"), "a") as f:
+                    f.write(f"\n=== {timestamp} ===\n")
+                    f.write(f"\nModel: {model} \n")
+                    f.write(f"\nProvider: {AI_PROVIDER}\n")
+                    f.write(f"IP: {request.remote_addr}\n")
+                    f.write(f"Chat mode: {is_chat}\n")
+                    f.write(json.dumps(data, indent=2) + "\n")
             except Exception as e:
                 print(f"Logging failed: {e}")
 
-        if len(messages) > 2:
-            response_text = handle_chat_request(messages, system_instruction)
-        else:
-            user_content = messages[1]["content"]
-            response_text = single_response(user_content.strip(), system_instruction)
-
         if stream:
             return Response(
-                stream_with_context(stream_openai_format(response_text)),
-                mimetype="text/event-stream"
+                stream_with_context(stream_ai(messages, model, system_instruction)),
+                mimetype='text/event-stream'
             )
         else:
+            content = call_ai(messages, model, system_instruction)
             return jsonify({
-                "choices": [{
-                    "message": {
-                        "role": "assistant",
-                        "content": response_text
-                    }
-                }]
+                "choices": [{"message": {"role": "assistant", "content": content}}]
             })
 
     except Exception as e:
         print(f"Error: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
