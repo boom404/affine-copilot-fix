@@ -38,7 +38,6 @@ Content of my config.json
 
 Content of my docker-compose.yml
 
-I'm using two seperate networks. One between the containers `affine-net` and `traefik-net` for the reverse proxy  
 
 ```yml
 name: affine
@@ -59,7 +58,6 @@ services:
             - 5000:5000
         image: affine-copilot-fix:latest
         networks:
-            - traefik-net
             - affine-net
 
     affine:
