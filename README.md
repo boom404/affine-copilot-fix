@@ -4,17 +4,17 @@ This python script creates a small http server, to handle the Affine Copilot fea
 
 ## Create API Key
 
-Get a free Gemini API Key https://aistudio.google.com/apikey
+To use the Gemini API, you need to obtain an API Key. Visit the following link to create your free Gemini API Key: [Get a free Gemini API Key](https://aistudio.google.com/apikey). Once you have the key, you can use it to configure the application as described below.
 
 ## Docker Installation
 
-I'm using Affine in a docker container. You need to create `config.json` in your volumes and enable the copilot feature.  The baseUrl must be link to your script. "apiKey, can as it is. It has no effect.
+I'm using Affine in a docker container. You need to create `config.json` in your volumes and enable the copilot feature. The `baseUrl` must point to your script, and the `apiKey` field can remain unchanged as it does not affect the functionality.
 
 ```bash
 nano ./volumes/affine/self-host/config/config.json 
 ```
 
-Content on my config.json
+Content of my config.json
 
 ```json
 {
@@ -38,35 +38,42 @@ Content on my config.json
 
 Content of my docker-compose.yml
 
-I'musing two seperate networks. One between the containers `affine-net` and `treaefik-net` for the reverse proxy  
+I'm using two seperate networks. One between the containers `affine-net` and `traefik-net` for the reverse proxy  
 
 ```yml
+name: affine
+services:
+    affine-copilot-fix:
+        container_name: affine-copilot-fix
+        user: "1000:1000"
+        build:
+            context: ./affine-copilot-fix
+            dockerfile: Dockerfile
+        volumes:
+            - ./logs:/app/src/logs
+        environment:
+            - CREATE_LOG=True
+            - API_KEY=<ENTER YOUR FREE GEMINI API KEY>
+            - AI_GEMINI_MODEL=gemini-2.0-flash
+        ports:
+            - 5000:5000
+        image: affine-copilot-fix:latest
+        networks:
+            - traefik-net
+            - affine-net
 
-affine-copilot-fix:
-    container_name: affine-copilot-fix
-    user: "1000:1000"
-    build:
-        context: ./affine-copilot-fix
-        dockerfile: Dockerfile
-    volumes:
-        - ./logs:/app/src/logs
-    environment:
-        - CREATE_LOG=True
-        - API_KEY=<ENTER YOUR FREE GEMINI API KEY>
-        - AI_GEMINI_MODEL=gemini-2.0-flash
-    ports:
-        - 5000:5000
-    image: affine-copilot-fix:latest
-    networks:
-        - traefik-net
-        - affine-net
+    affine:
+        image: ghcr.io/toeverything/affine-graphql:${AFFINE_REVISION:-stable}
+        ...
+
 ```
 
-## Switch to source dir
-    cd ./src
-
-
 ## Installation without Docker
+
+### Switch to Source Directory
+``` bash
+cd ./src
+```
 
 Create .env file and change your settings
 
@@ -76,7 +83,7 @@ cp .env.example .env
 
 
 
-## Create virtual environment
+### Set Up a Python Virtual Environment
 
 ```bash
 python -m venv myenv
@@ -105,6 +112,9 @@ pip install -r requirements.txt
 
 
 ## Run your server
+
+To start the server, run the following command:
+
 ```bash
 python endpoint.py
 ```
