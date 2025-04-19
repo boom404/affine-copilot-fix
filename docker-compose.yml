@@ -11,8 +11,9 @@ services:
       - ./logs:/app/src/logs
     environment:
       - CREATE_LOG=True
-      - API_KEY=mysecretkey
-      - AI_GEMINI_MODEL=gemini-2.0-flash
+      - OPENAI_API_KEY=
+      - OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/ # https://openrouter.ai/api/v1/
+      - OPENAI_MODEL=gemini-2.5-flash-preview-04-17 # Options: gemini-2.0-flash, gemini-2.5-flash-preview-04-17
     ports:
       - 5000:5000
     image: affine-copilot-fix:latest
