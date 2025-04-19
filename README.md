@@ -1,6 +1,6 @@
 # Affine Copilot Fix
 
-This python script creates a small http server, to handle the Affine Copilot feature with Gemini from Google. Gemini has a free-tier AI API feature.
+This python script creates a small http server, to handle the Affine Copilot feature with Gemini from Google or any other OpenAI compatible API. Gemini has a free-tier AI API feature.
 
 ## Create API Key
 
@@ -12,7 +12,7 @@ Once you have the key(s), you can use it to configure the application as describ
 
 ## Docker Installation
 
-I'm using Affine in a docker container. You need to create `config.json` in your volumes and enable the copilot feature. The `baseUrl` must point to your script, and the `apiKey` field can remain unchanged as it does not affect the functionality.
+I'm using Affine in a docker container. You need to create `config.json` in your volumes and enable the copilot feature. The `baseUrl` must point to your script, and the `apiKey` must be set to anything. But NOT empty.
 
 ```bash
 nano ./volumes/affine/self-host/config/config.json 
@@ -56,11 +56,9 @@ services:
             - ./logs:/app/src/logs
         environment:
             - CREATE_LOG=True
-            - GEMINI_API_KEY=<ENTER YOUR FREE GEMINI API KEY>
-            - GEMINI_MODEL=gemini-2.5-flash-preview-04-17 # Options: gemini-2.0-flash, gemini-2.5-flash-preview-04-17
-            - OPENROUTER_API_KEY=<ENTER YOUR FREE OPENROUTER API KEY>
-            - OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324:free
-            - AI_PROVIDER=openrouter # Options: openrouter, gemini
+            - OPENAI_API_KEY=<ENTER YOUR FREE GEMINI OR OPENROUTER API KEY>
+            - OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/ # https://openrouter.ai/api/v1/
+            - OPENAI_MODEL=gemini-2.0-flash # Or any openrouter model
         ports:
             - 5000:5000
         image: affine-copilot-fix:latest

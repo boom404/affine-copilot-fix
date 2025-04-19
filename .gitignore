@@ -12,3 +12,5 @@ post_debugger_env
 
 # log folder from docker-compose
 logs/*
+
+.vscode/
