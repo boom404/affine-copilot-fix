@@ -70,6 +70,13 @@ services:
         ...
 
 ```
+## Restart Docker Container
+
+You need to use the `--force-recreate` flag to force to read your new config.json
+
+```bash
+docker compose up -d --force-recreate 
+```
 
 ## Installation without Docker
 
