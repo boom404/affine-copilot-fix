@@ -1,3 +1,6 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json"
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "local>homelab/renovate-bot:renovate-global"
+    ]
 }
