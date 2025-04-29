@@ -1,5 +1,5 @@
 # ---- Builder Stage ----
-FROM python:3.9-slim AS builder
+FROM python:3.13-slim AS builder
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # ---- Runtime Stage ----
-FROM python:3.9-slim
+FROM python:3.13-slim
 
 # Set explicit UID/GID
 ARG UID=1000
