@@ -31,9 +31,6 @@ VOLUME /app/src/logs
 
 # Explicitly set environment variables
 ENV PYTHONUNBUFFERED=1
-ENV CREATE_LOG=True \
-    API_KEY="" \
-    AI_GEMINI_MODEL="gemini-2.0-flash"
 
 # Create user and set permissions
 RUN groupadd -g $GID mygroup && \
