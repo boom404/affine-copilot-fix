@@ -5,10 +5,12 @@ from dotenv import load_dotenv
 import os
 import time
 import openai
+import logging
 
 # Load environment variables
 load_dotenv()
 app = Flask(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
 # Settings
 CREATE_LOG = bool(os.getenv('CREATE_LOG', False))
