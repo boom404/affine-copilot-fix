@@ -5,7 +5,7 @@ certifi==2025.8.3
 click==8.2.1
 distro==1.9.0
 dotenv==0.9.9
-Flask==3.1.1
+Flask==3.1.2
 h11==0.16.0
 httpcore==1.0.9
 httpx==0.28.1
