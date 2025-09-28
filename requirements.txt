@@ -14,7 +14,7 @@ itsdangerous==2.2.0
 Jinja2==3.1.6
 jiter==0.10.0
 MarkupSafe==3.0.3
-openai==1.107.2
+openai==1.109.1
 pydantic==2.11.9
 pydantic_core==2.33.2
 python-dotenv==1.1.1
