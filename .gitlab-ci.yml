@@ -1,7 +1,7 @@
 default:
-  image: docker:28.5.1
+  image: docker:28.5.2
   services:
-    - docker:28.5.1-dind
+    - docker:28.5.2-dind
   before_script:
     - docker info
 
