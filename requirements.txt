@@ -1,5 +1,5 @@
 annotated-types==0.7.0
-anyio==4.11.0
+anyio==4.12.0
 blinker==1.9.0
 certifi==2025.11.12
 click==8.3.1
