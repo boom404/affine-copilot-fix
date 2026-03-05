@@ -2,5 +2,11 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "local>homelab/renovate-bot:renovate-global"
-    ]
+    ],
+  "packageRules": [
+    {
+      "matchPackageNames": ["pydantic", "pydantic-core"],
+      "groupName": "pydantic"
+    }
+  ]    
 }
