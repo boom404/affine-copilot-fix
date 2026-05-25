@@ -12,7 +12,7 @@ httpx==0.28.1
 idna==3.16
 itsdangerous==2.2.0
 Jinja2==3.1.6
-jiter==0.14.0
+jiter==0.15.0
 MarkupSafe==3.0.3
 openai==1.109.1
 pydantic==2.13.4
