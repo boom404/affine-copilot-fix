@@ -13,4 +13,11 @@ post_debugger_env
 # log folder from docker-compose
 logs/*
 
+# python
+__pycache__/
+*.pyc
+
+# local test virtualenv
+venv/
+
 .vscode/

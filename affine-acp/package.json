@@ -1,0 +1,11 @@
+{
+  "name": "affine-acp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenAI-compatible <-> ACP bridge for AFFiNE copilot (Claude Code / Codex / Gemini CLI)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

@@ -1,19 +1,57 @@
----
-name: affince-copilot-fix
+# Example: the gateway + the optional ACP sidecar.
+# Attach these to the same Docker network as your AFFiNE server, and point
+# AFFiNE's providers.openai.baseUrl at http://affine-copilot-fix:5000
+#
+# Replace the placeholders (API key, /path/to/... credential dirs) before use.
 services:
   affine-copilot-fix:
     container_name: affine-copilot-fix
-    user: "1000:1000"
     build:
-      context: .
-      dockerfile: Dockerfile
-    volumes:
-      - ./logs:/app/src/logs
+      context: ./affine-copilot-fix
     environment:
       - CREATE_LOG=True
-      - OPENAI_API_KEY=
-      - OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/ # https://openrouter.ai/api/v1/
-      - OPENAI_MODEL=gemini-2.5-flash-preview-04-17 # Options: gemini-2.0-flash, gemini-2.5-flash-preview-04-17
+      # Fallback / non-agent scenarios (embeddings, images, plain chat) go here:
+      - OPENAI_API_KEY=your-openai-compatible-api-key
+      - OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+      - OPENAI_MODEL=gemini-2.5-flash-lite
+      # --- optional: route text scenarios to the ACP sidecar ---
+      # PROVIDERS: one entry per ACP agent you want (all point at the sidecar).
+      #   Keep only the agents you actually use.
+      - 'PROVIDERS={"claude":{"base_url":"http://affine-acp:5100/claude/v1","api_key":"acp"},"codex":{"base_url":"http://affine-acp:5100/codex/v1","api_key":"acp"},"gemini":{"base_url":"http://affine-acp:5100/gemini/v1","api_key":"acp"}}'
+      # MODEL_ROUTES: map an OpenAI model name AFFiNE recognizes -> {agent, model}.
+      # Pick whichever you need; each AFFiNE scenario uses one of these names.
+      #   Claude (aliases sonnet|opus|haiku):  gpt-5-mini -> sonnet , gpt-5 -> opus
+      #   Codex  (ChatGPT subscription):       gpt-5-codex -> codex (default model)
+      #   Gemini (Google login; e.g. gemini-2.5-pro / -flash):  gpt-4.1 -> gemini
+      - 'MODEL_ROUTES={"gpt-5-mini":{"provider":"claude","model":"sonnet"},"gpt-5":{"provider":"claude","model":"opus"},"gpt-5-codex":{"provider":"codex","model":""},"gpt-4.1":{"provider":"gemini","model":"gemini-2.5-pro"}}'
     ports:
       - 5000:5000
-    image: affine-copilot-fix:latest
+    restart: unless-stopped
+    depends_on:
+      - affine-acp
+    networks:
+      - affine-net
+
+  # Optional — only needed for the subscription/ACP agents. Remove if unused.
+  affine-acp:
+    container_name: affine-acp
+    user: "1000:1000"
+    build:
+      context: ./affine-acp
+    environment:
+      - PORT=5100
+      - HOME=/home/node
+      - ACP_CWD=/tmp
+    volumes:
+      # Subscription logins, mounted so tokens can refresh (same UID as the
+      # container user). Uncomment the ones matching the agents you use above.
+      - /path/to/.claude:/home/node/.claude
+      # - /path/to/.codex:/home/node/.codex
+      # - /path/to/.gemini:/home/node/.gemini
+    restart: unless-stopped
+    networks:
+      - affine-net
+
+networks:
+  affine-net:
+    external: true

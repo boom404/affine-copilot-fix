@@ -1,130 +1,35 @@
-# Affine Copilot Fix
+# AFFiNE Copilot Fix
 
-This python script creates a small http server, to handle the Affine Copilot feature with Gemini from Google or any other OpenAI compatible API. Gemini has a free-tier AI API feature.
+Two small companion services that free the **AFFiNE** self-hosted copilot from its
+built-in provider restrictions. AFFiNE talks to the gateway as its "openai"
+provider; the gateway routes each scenario wherever you want.
 
-## Create API Key
-
-To use the Gemini API, you need to obtain an API Key. Visit the following link to create your free Gemini API Key: [Get a free Gemini API Key](https://aistudio.google.com/apikey). 
-
-To use the OpenRouter API, you need to obtain an API Key. Visit the following link to create your free OpenRouter API Key: [Get a free OpenRouter API Key](https://openrouter.ai/settings/keys). 
-
-Once you have the key(s), you can use it to configure the application as described below.
-
-## Docker Installation
-
-I'm using Affine in a docker container. You need to create `config.json` in your volumes and enable the copilot feature. The `baseUrl` must point to your script, and the `apiKey` must be set to anything. But NOT empty.
-
-```bash
-nano ./volumes/affine/self-host/config/config.json 
-```
-
-Content of my config.json
-
-```json
-{
-    "$schema": "https://github.com/toeverything/affine/releases/latest/download/config.schema.json",
-    "server": {
-        "name": "My AFFiNE server"
-    },
-    "copilot": {
-        "enabled": true,
-        "providers.openai": {
-            "apiKey": "my-not-exist-api-key",
-            "baseUrl": "http://affine-copilot-fix:5000"
-        },
-        "providers.gemini": {
-            "apiKey": ""
-        }
-    }
-}
-```
-
-
-Content of my docker-compose.yml
-
-
-```yml
-name: affine
-services:
-    affine-copilot-fix:
-        container_name: affine-copilot-fix
-        user: "1000:1000"
-        build:
-            context: ./affine-copilot-fix
-            dockerfile: Dockerfile
-        volumes:
-            - ./logs:/app/src/logs
-        environment:
-            - CREATE_LOG=True
-            - OPENAI_API_KEY=<ENTER YOUR FREE GEMINI OR OPENROUTER API KEY>
-            - OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/ # https://openrouter.ai/api/v1/
-            - OPENAI_MODEL=gemini-2.0-flash # Or any openrouter model
-        ports:
-            - 5000:5000
-        image: affine-copilot-fix:latest
-        networks:
-            - affine-net
-
-    affine:
-        image: ghcr.io/toeverything/affine-graphql:${AFFINE_REVISION:-stable}
-        ...
+| Folder | Service | What it does |
+| ------ | ------- | ------------ |
+| [`affine-copilot-fix/`](affine-copilot-fix) | **gateway** (Python/Flask) | OpenAI-compatible endpoint AFFiNE points at. Emulates the Responses API, routes each scenario to a provider/model, and proxies `embeddings` / `images` to a real API. |
+| [`affine-acp/`](affine-acp) | **ACP sidecar** (Node) — *optional* | Runs the **text** scenarios on a coding agent over ACP (**Claude Code / Codex / Gemini CLI**) using your **subscription login** instead of an API key. |
 
 ```
-## Restart Docker Container
-
-You need to use the `--force-recreate` flag to force to read your new config.json
-
-```bash
-docker compose up -d --force-recreate 
+AFFiNE ──OpenAI/Responses──► affine-copilot-fix ──┬─► real OpenAI-compatible API
+                              (gateway, required)  │   (embeddings, images, chat…)
+                                                   └─► affine-acp ──► Claude / Codex / Gemini
+                                                       (optional)     (your subscription, via ACP)
 ```
 
-## Installation without Docker
+## Which do I need?
 
-### Switch to Source Directory
-``` bash
-cd ./src
-```
+* **Just want any OpenAI-compatible API** (e.g. Gemini free tier, OpenRouter) behind
+  AFFiNE, with per-scenario model routing? → the **gateway alone** is enough.
+* **Want text scenarios on your Claude / Codex / Gemini subscription?** → add the
+  **ACP sidecar**. It only works together with the gateway — AFFiNE never talks to
+  it directly.
 
-Create .env file and change your settings
+## Quick start
 
-```
-cp .env.example .env
-```
+1. Point AFFiNE's `providers.openai.baseUrl` at the gateway (`http://affine-copilot-fix:5000`).
+2. Configure the gateway — see [`affine-copilot-fix/README.md`](affine-copilot-fix/README.md).
+3. *(optional)* Add the ACP sidecar — see [`affine-acp/README.md`](affine-acp/README.md).
 
+A ready-to-adapt [`docker-compose.yml`](docker-compose.yml) builds both services.
 
-
-### Set Up a Python Virtual Environment
-
-```bash
-python -m venv myenv
-```
-    
-
-### Activate virtual env
-
-#### On Windows:
-
-```bash
-myenv\Scripts\activate
-```
-
-#### On Mac/Linux:
-
-```bash
-source myenv/bin/activate
-```
-
-## Install requirements
-
-```
-pip install -r requirements.txt
-```
-
-
-## Run your server
-
-To start the server, run the following command:
-
-```bash
-python endpoint.py
-```
+## Not affiliated with AFFiNE, Anthropic, OpenAI, or Google.

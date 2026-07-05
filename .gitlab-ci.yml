@@ -1,11 +1,17 @@
 default:
   image: docker:28.5.2
+
 before_script:
-    - docker info
+  - docker info
 
 stages: [build]
 
-build:
+build-gateway:
   stage: build
   script:
-    - docker build -t my-docker-image .
+    - docker build -t affine-copilot-fix ./affine-copilot-fix
+
+build-acp:
+  stage: build
+  script:
+    - docker build -t affine-acp ./affine-acp
